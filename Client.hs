@@ -4,8 +4,8 @@ import Network.Socket
 import System.IO
 import Control.Monad
 
-main =
-    do  addrinfos <- getAddrInfo Nothing (Just "72.192.13.69") (Just "1267")
+main ip =
+    do  addrinfos <- getAddrInfo Nothing (Just ip) (Just "1267")
         let serveraddr = head addrinfos
         sock <- socket (addrFamily serveraddr) Stream 6
         setSocketOption sock KeepAlive 1
