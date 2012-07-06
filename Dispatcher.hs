@@ -23,25 +23,9 @@ main =
         bindSocket sock (addrAddress serveraddr)
         -- listen with maximum 5 queued requests
         listen sock 5
-        chansRecv <- newTVarIO []
         chansSend <- newTVarIO []
-        -- thread off process to check chans for events
-        forkIO $ checkEvents chansRecv chansSend
         -- accept forever
-        forever $ acceptCon sock chansRecv chansSend
-
-checkEvents chansRecv chansSend = 
-    do  forever $ do chans <- readTVarIO chansRecv
-                     mapM_ (checkEvent) chans
-    where
-        checkEvent (clientAddr, chan) = 
-         do putStrLn $ "Checking for event"
-            atomically $
-             do event <- readTChan chan
-                chans <- readTVar chansSend
-                case (lookup clientAddr chans) of
-                    Nothing -> retry
-                    Just chan -> writeTChan chan event
+        forever $ acceptCon sock chansSend
 
 handleEvents chan = forever $
     do  event <- atomically $ readTChan chan
@@ -51,18 +35,16 @@ handleEvents chan = forever $
 -- accept a connection and fork a new thread to handle receiving events from it
 -- after the connection is accepted, create a new channel for the dispatcher to
 -- receive events from.
-acceptCon sock chansRecv chansSend =
+acceptCon sock chansSend =
     do  (connsock, clientaddr) <- accept sock
         putStrLn $ "Connection received from: " ++ show clientaddr
         connHandle <- socketToHandle connsock ReadMode
         hSetBuffering connHandle NoBuffering
         hSetBinaryMode connHandle True
-        chanRecv <- newTChanIO
         chanSend <- newTChanIO
-        forkIO (recvEvents connHandle chanRecv)
+        forkIO (recvEvents connHandle chanSend)
         forkIO (handleEvents chanSend)
-        atomically  $   do  modifyTVar chansRecv (\xs -> (clientaddr, chanRecv):xs)
-                            modifyTVar chansSend (\xs -> (clientaddr, chanSend):xs)
+        atomically  $   do  modifyTVar chansSend (\xs -> (clientaddr, chanSend):xs)
 
 -- Receive events until the connection is closed, parse them, and push them on the
 -- channel to the dispatcher
@@ -81,7 +63,7 @@ recvEvents handle chan =
                                                     atomically $ writeTChan chan a
         parseMsg = do choice (map (\(EventParser p) -> p) listenerParsers)
         nullLines "" = []
-        nullLines str = x:(nullLines xs) 
+        nullLines str = x:(nullLines xs)
             where   (x, xs) = splitAt (nullLines' 0 str) str
                     nullLines' n [] = n
                     nullLines' n ('\0':'\0':str) = n+2
