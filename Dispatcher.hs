@@ -18,7 +18,7 @@ main =
                                  Nothing (Just "1267")
         let serveraddr = head addrinfos
         -- create socket
-        sock <- socket (addrFamily serveraddr) Stream 132
+        sock <- socket (addrFamily serveraddr) Stream 6
         -- bind to the address we're listening on
         bindSocket sock (addrAddress serveraddr)
         -- listen with maximum 5 queued requests
