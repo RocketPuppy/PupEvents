@@ -12,10 +12,11 @@ import Listener
 import Handler
 
 -- Make a socket, communication channels and start listening for connections
-main = 
+dispatcher Nothing = dispatcher (Just "0.0.0.0")
+dispatcher (Just ip) = 
     do  -- get port
         addrinfos <- getAddrInfo (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                                 Nothing (Just "1267")
+                                 (Just ip) (Just "1267")
         let serveraddr = head addrinfos
         -- create socket
         sock <- socket (addrFamily serveraddr) Stream 6

@@ -6,7 +6,13 @@ import Text.Parsec
 
 listenerParsers = [keyPress]
 
+data EventPackage = EventPackage EventPrinter EventParser
+
+-- for getting from the wire
 data EventParser = EventParser (Parsec String () Event)
+
+-- for printing on the wire
+data EventPrinter = EventPrinter (Event -> String)
 
 -- Internal Event Representation
 data Event = KeyPress Char | MousePress Int
