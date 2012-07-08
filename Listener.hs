@@ -3,6 +3,7 @@ module Listener where
 import GHC.IO.Handle
 import Control.Concurrent.STM.TChan
 import Text.Parsec
+import Events
 
 listenerParsers = [keyPress]
 
