@@ -8,8 +8,7 @@ import Control.Monad
 import Text.Parsec
 import Network.Socket
 import System.IO
-import Listener
-import Handler
+import Events
 
 -- Make a socket, communication channels and start listening for connections
 dispatcher Nothing = dispatcher (Just "0.0.0.0")
@@ -28,23 +27,26 @@ dispatcher (Just ip) =
         -- accept forever
         forever $ acceptCon sock chansSend
 
-handleEvents chan = forever $
+handleEvents handle chan = forever $
     do  event <- atomically $ readTChan chan
         putStrLn $ "Event received from Dispatcher"
         (lookupHandler event) $ event
+        hPutStr handle ((lookupUnHandler event) event)
+        hFlush handle
 
 -- accept a connection and fork a new thread to handle receiving events from it
 -- after the connection is accepted, create a new channel for the dispatcher to
 -- receive events from.
 acceptCon sock chansSend =
-    do  (connsock, clientaddr) <- accept sock
+    do  putStrLn "Accepting Connections"
+        (connsock, clientaddr) <- accept sock
         putStrLn $ "Connection received from: " ++ show clientaddr
-        connHandle <- socketToHandle connsock ReadMode
+        connHandle <- socketToHandle connsock ReadWriteMode
         hSetBuffering connHandle NoBuffering
         hSetBinaryMode connHandle True
         chanSend <- newTChanIO
         forkIO (recvEvents connHandle chanSend)
-        forkIO (handleEvents chanSend)
+        forkIO (handleEvents connHandle chanSend)
         atomically  $   do  modifyTVar chansSend (\xs -> (clientaddr, chanSend):xs)
 
 -- Receive events until the connection is closed, parse them, and push them on the
@@ -62,7 +64,7 @@ recvEvents handle chan =
                                     Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
                                     Right a ->  do  putStrLn "Parsed Message"
                                                     atomically $ writeTChan chan a
-        parseMsg = do choice (map (\(EventParser p) -> p) listenerParsers)
+        parseMsg = do choice parsers
         nullLines "" = []
         nullLines str = x:(nullLines xs)
             where   (x, xs) = splitAt (nullLines' 0 str) str
