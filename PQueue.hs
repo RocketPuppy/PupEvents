@@ -1,28 +1,24 @@
 module PQueue where
 
+import Control.Concurrent.STM
+import Control.Monad
+
+newtype Priority = Priority Int
 -- create pqueue
 makeQueues num =
-    do  return $ take num $ mapM (\_ -> newTChan) $ repeat 1
-    where
-        makeQueues' num [] = do 
-    do  p1 <- newTChanIO
-        p2 <- newTChanIO
-        p3 <- newTChanIO
-        return (p1, p2, p3)
+    do  replicateM 3 newTChanIO
 
--- get first thing in pQueue
-getElem (Nothing, Nothing, p3) =
-    do  event <- atomically $ tryReadTChan p3
-        case event of 
-            Nothing -> return Nothing
-            Just e -> return e
-getElem (Nothing, p2, p3) =
-    do  event <- atomically $ tryReadTChan p2
+-- get the next thing in the queuern thing
+getThing [] = return Nothing
+getThing queues = 
+    do  event <- atomically $ tryReadTChan $ head queues
         case event of
-            Nothing -> getElem (Nothing, Nothing, p3)
-            Just e -> return e
-getElem (p1, p2, p3) =
-    do  event <- atomically $ tryReadTChan p1
-        case event of
-            Nothing -> getElem (Nothing, p2, p3)
-            Just e -> return e
+            Nothing -> getThing $ tail queues
+            Just e -> return (Just e)
+
+-- write something to the queue
+writeThing queues priority thing =
+    do  if length queues < priority && priority > 0
+            then putStrLn "Not writing"
+            else do putStrLn "Writing"
+                    atomically $ do writeTChan (queues !! priority) thing

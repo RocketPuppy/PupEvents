@@ -2,13 +2,17 @@ module Client where
 
 import Network.Socket
 import System.IO
+import Control.Concurrent
+import Control.Concurrent.STM
 import Control.Monad
+import Text.Parsec
 import Events
+import PQueue
 
 -- The client works much like the Dispatcher, except it doesn't listen
 -- for connections from other places
 -- Make a socket, connect to server, send and receive events
-main ip =
+client ip =
     -- get address info
     do  addrinfos <- getAddrInfo Nothing (Just ip) (Just "1267")
         let serveraddr = head addrinfos
@@ -19,59 +23,39 @@ main ip =
         connect sock (addrAddress serveraddr)
         -- convert to handle for convenience
         handle <- socketToHandle sock ReadWriteMode
-        hSetBuffering handle (NoBuffering Nothing)
-        -- create handle lock
-        lock <- newEmptyTMVarIO
-        forkIO $ sendEvents handle lock
-        forkIO $ 
+        hSetBuffering handle NoBuffering
+        -- create pqueue
+        pqueue <- makeQueues 3
+        -- fork threads for listening for events clientside
+        mapM_ (\x -> forkIO $ x handle pqueue) eventListeners
+        -- fork communication threads to server
+        forkIO $ sendEvents handle pqueue
+        forkIO $ recvEvents handle
 
-acceptInput handle = forever $
-    do  char <- getChar
-        hPutStr handle ("KeyPress\0" ++ char:"\0\0")
-        hFlush handle
+-- These functions exist to listen for specific events on the Client and send them to the server
+-- when new listeners are added add them to eventListeners or they won't get called
+eventListeners = [acceptInput]
+-- listen for keyboard input
+acceptInput handle pqueue = forever $
+    do  hSetBuffering stdin NoBuffering
+        chars <- hGetContents stdin
+        mapM_ (\x -> sendToServ x pqueue) chars
+    where
+        sendToServ char pqueue =
+            do  putStrLn $ "char captured: " ++ show char
+                let event = KeyPress char
+                writeThing pqueue (lookupPriority event) event
 
--- Make a socket, communication channels and start listening for connections
-dispatcher Nothing = dispatcher (Just "0.0.0.0")
-dispatcher (Just ip) = 
-    do  -- get port
-        addrinfos <- getAddrInfo (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                                 (Just ip) (Just "1267")
-        let serveraddr = head addrinfos
-        -- create socket
-        sock <- socket (addrFamily serveraddr) Stream 6
-        -- bind to the address we're listening on
-        bindSocket sock (addrAddress serveraddr)
-        -- listen with maximum 5 queued requests
-        listen sock 5
-        chansSend <- newTVarIO []
-        -- accept forever
-        forever $ acceptCon sock chansSend
+sendEvents handle pqueue = forever $
+    do  e <- getThing pqueue
+        case e of
+            Nothing -> return ()
+            Just event -> do    putStrLn $ show event
+                                hPutStr handle ((lookupUnHandler event) event)
+                                hFlush handle
 
-handleEvents handle chan = forever $
-    do  event <- atomically $ readTChan chan
-        putStrLn $ "Event received from Dispatcher"
-        (lookupHandler event) $ event
-        hPutStr handle ((lookupUnHandler event) event)
-        hFlush handle
-
--- accept a connection and fork a new thread to handle receiving events from it
--- after the connection is accepted, create a new channel for the dispatcher to
--- receive events from.
-acceptCon sock chansSend =
-    do  putStrLn "Accepting Connections"
-        (connsock, clientaddr) <- accept sock
-        putStrLn $ "Connection received from: " ++ show clientaddr
-        connHandle <- socketToHandle connsock ReadWriteMode
-        hSetBuffering connHandle NoBuffering
-        hSetBinaryMode connHandle True
-        chanSend <- newTChanIO
-        forkIO (recvEvents connHandle chanSend)
-        forkIO (handleEvents connHandle chanSend)
-        atomically  $   do  modifyTVar chansSend (\xs -> (clientaddr, chanSend):xs)
-
--- Receive events until the connection is closed, parse them, and push them on the
--- channel to the dispatcher
-recvEvents handle chan =
+-- Receive events until the connection is closed, parse them, and handle them
+recvEvents handle =
     -- I don't really understand how these two lines work, but I think its
     -- got something to do with lazy evalution.  they're from RWH.
     do  messages <- hGetContents handle
@@ -83,7 +67,8 @@ recvEvents handle chan =
                 do case (parse parseMsg "" str) of
                                     Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
                                     Right a ->  do  putStrLn "Parsed Message"
-                                                    atomically $ writeTChan chan a
+                                                    (lookupHandler a Client) a
+        -- parsers is a global list of parsers imported from Events
         parseMsg = do choice parsers
         nullLines "" = []
         nullLines str = x:(nullLines xs)
