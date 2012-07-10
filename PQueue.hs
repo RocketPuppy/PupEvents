@@ -11,7 +11,7 @@ makeQueues num =
 -- get the next thing in the queuern thing
 getThing [] = return Nothing
 getThing queues = 
-    do  event <- atomically $ tryReadTChan $ head queues
+    do  event <- tryReadTChan $ head queues
         case event of
             Nothing -> getThing $ tail queues
             Just e -> return (Just e)

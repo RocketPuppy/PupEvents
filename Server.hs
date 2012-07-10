@@ -1,4 +1,4 @@
-module Server where
+module Main (main) where
 
 import GHC.IO.Handle
 import Control.Concurrent.STM
@@ -10,13 +10,20 @@ import Network.Socket
 import System.IO
 import Events
 import PQueue
+import System.Environment
+
+main =
+    do  args <- getArgs
+        let ip = args !! 0
+        let priorities = args !! 1
+        server (Just ip) priorities
 
 -- Make a socket, communication channels and start listening for connections
-server Nothing = server (Just "0.0.0.0")
-server (Just ip) = 
+server Nothing priorities= server (Just "0.0.0.0") priorities
+server ip priorities= 
     do  -- get port
         addrinfos <- getAddrInfo (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                                 (Just ip) (Just "1267")
+                                 ip (Just "1267")
         let serveraddr = head addrinfos
         -- create socket
         sock <- socket (addrFamily serveraddr) Stream 6
@@ -26,28 +33,30 @@ server (Just ip) =
         listen sock 5
         chansSend <- newTVarIO []
         -- accept forever
-        forever $ acceptCon sock chansSend
+        forever $ acceptCon sock chansSend priorities
 
 handleEvents handle pqueue = forever $
-    do  event <- getThing pqueue
-        case event of
-            Nothing -> return ()
-            Just event -> do    putStrLn $ "Event received from Dispatcher"
-                                (lookupHandler event Server) $ event
-                                hPutStr handle ((lookupUnHandler event) event)
-                                hFlush handle
+    do  event <- atomically $
+            do  event <- getThing pqueue
+                case event of
+                    Nothing -> retry
+                    Just event -> return event
+        putStrLn $ "Event received from Dispatcher"
+        event' <- (lookupHandler event Server) $ event
+        hPutStr handle ((lookupUnHandler event') event')
+        hFlush handle
 
 -- accept a connection and fork a new thread to handle receiving events from it
 -- after the connection is accepted, create a new channel for the dispatcher to
 -- receive events from.
-acceptCon sock chansSend =
+acceptCon sock chansSend priorities =
     do  putStrLn "Accepting Connections"
         (connsock, clientaddr) <- accept sock
         putStrLn $ "Connection received from: " ++ show clientaddr
         connHandle <- socketToHandle connsock ReadWriteMode
         hSetBuffering connHandle NoBuffering
         hSetBinaryMode connHandle True
-        pqueue <- makeQueues 3
+        pqueue <- makeQueues priorities
         forkIO (recvEvents connHandle pqueue)
         forkIO (handleEvents connHandle pqueue)
         atomically  $   do  modifyTVar chansSend (\xs -> (clientaddr, pqueue):xs)
