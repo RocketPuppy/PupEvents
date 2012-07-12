@@ -19,6 +19,5 @@ getThing queues =
 -- write something to the queue
 writeThing queues priority thing =
     do  if length queues < priority && priority > 0
-            then putStrLn "Not writing"
-            else do putStrLn "Writing"
-                    atomically $ do writeTChan (queues !! priority) thing
+            then return ()
+            else writeTChan (queues !! priority) thing

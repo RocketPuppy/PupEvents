@@ -72,10 +72,10 @@ recvEvents handle pqueue =
     where
         toDispatch str = 
             do  putStrLn $ "Message received: " ++ str
-                do case (parse parseMsg "" str) of
-                                    Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
-                                    Right a ->  do  putStrLn "Parsed Message"
-                                                    writeThing pqueue (lookupPriority a) a
+                do  case (parse parseMsg "" str) of
+                        Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
+                        Right a ->  do  putStrLn "Parsed Message"
+                                        atomically $ writeThing pqueue (lookupPriority a) a
         parseMsg = do choice parsers
         nullLines "" = []
         nullLines str = x:(nullLines xs)

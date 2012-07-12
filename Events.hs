@@ -26,32 +26,11 @@ data HandlerMode = Client | Server
 
 -- Events and their structures, both internal and external representation
 
--- If you don't add your event parsers to this list they won't get called!
-parsers = [keyPress, click]
-
---------------
--- KeyPress --
---------------
--- the un* functions should generate the representation of the event that goes on the wire.
-unKeyPress (KeyPress c) = "KeyPress\0" ++ c:"\0\0"
-
--- We parse the event off the wire with parsec
-keyPress :: Parsec String () Event
-keyPress = do string "KeyPress"
-              char '\0'
-              c <- option '\0' (noneOf "\0")
-              return (KeyPress c)
-
--- Each event should have a server and a client handler
--- Server handlers should return either the original event, or the new event from the handler
--- Client handlers should not return anything (return values are ignored)
-keyPressHandler Server (KeyPress c) = 
-    do  putStrLn $ "keypress from client: " ++ show c
-        return (KeyPress c)
-keyPressHandler Client (KeyPress c) =
-    do  putStrLn $ "keypress from server: " ++ show c
-        return (KeyPress c)
-
+-- | Making new handlers is fairly simple.  You need several things to have a complete event representation.
+-- * First is the parser to parse the event off the wire.  Currently the format of events on the wire is Name\0Arg1\0Arg2\0...\0ArgN\0\0.  You must follow this layout.  If you wish to change it you'll need to change the RecvEvents functions in the Client and Server modules.  Parsers have the type @Parsec String () Event@.
+-- * Second is the unParser, which simply returns the string to be sent on the wire representing your event.  unParsers have the type @Event -> String@.
+-- * Third is the handler.  There is the ability to do separate things depending on if you're handling the event on the Client or the Server.  Event handlers should always return the event they are handling.  They have the type @Handler -> Event -> IO Event@.
+-- After you have created your handler you need to add it to the convenience functions.  It's simple really, just follow the examples already there.
 
 -----------
 -- Click --
@@ -76,14 +55,16 @@ click =
         string "\0\0"
         return (Click (read p1) (read p2))
 
+unClick :: Event -> String
 unClick (Click p1 p2) = "Click\0" ++ (show p1) ++ '\0':(show p2) ++ "\0\0"
 
 clickHandler :: HandlerMode -> Event -> IO Event
 clickHandler Server (Click p1 p2) = return (Click (negate p1) (negate p2))
 clickHandler Client event@(Click p1 p2) =
     do  GL.preservingMatrix $ GL.renderPrimitive GL.Points $ do
-            GL.color (GL.Color4 0 1 0 1 :: GL.Color4 Float)
+            GL.color (GL.Color4 1 0 1 1 :: GL.Color4 Float)
             GL.vertex (GL.Vertex2 p1 p2 :: GL.Vertex2 Float)
+        putStrLn $ "handling click"
         return event
 ----------------
 -- Initialize --
@@ -100,28 +81,16 @@ initHandler Client (Init) =
         GL.loadIdentity
         return Init
 
+-- If you don't add your event parsers to this list they won't get called!
+parsers = [click]
+
 -- Convenience functions. Pattern match on the Event constructor and return the wanted data
 lookupPriority (Init) = 0
-lookupPriority (KeyPress _) = 0
 lookupPriority (Click _ _ ) = 0
+
 lookupHandler (Init) mode = initHandler mode
 lookupHandler (Click _ _ ) mode = clickHandler mode
-lookupHandler (KeyPress _) mode = keyPressHandler mode
-lookupParser (Click _ _ ) = click
-lookupParser (KeyPress _) = keyPress
-lookupUnHandler (Click _ _ ) = unClick
-lookupUnHandler (KeyPress _) = unKeyPress
 
--- These functions exist to listen for specific events on the Client and send them to the server
--- when new listeners are added add them to eventListeners or they won't get called
-eventListeners = [acceptInput]
--- listen for keyboard input
-acceptInput pqueue = forever $
-    do  hSetBuffering stdin NoBuffering
-        chars <- hGetContents stdin
-        mapM_ (\x -> sendToServ x pqueue) chars
-    where
-        sendToServ char pqueue =
-            do  putStrLn $ "char captured: " ++ show char
-                let event = KeyPress char
-                writeThing pqueue (lookupPriority event) event
+lookupParser (Click _ _ ) = click
+
+lookupUnHandler (Click _ _ ) = unClick

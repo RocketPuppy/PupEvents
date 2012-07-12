@@ -28,20 +28,21 @@ client ip priorities =
         -- create pqueue
         outqueue <- makeQueues priorities
         inqueue <- makeQueues priorities
-        -- fork threads for listening for events clientside
-        mapM_ (\x -> forkIO $ x outqueue) eventListeners
         -- fork communication threads to server
         forkIO $ sendEvents handle outqueue
         forkIO $ recvEvents handle inqueue
+        -- outqueue is the outgoing messages to the server
+        -- inqueue is the incoming messages from the server
         return (outqueue, inqueue)
 
+-- send events to the server for processing
 sendEvents handle pqueue = forever $
     do  event <- atomically $
             do  e <- getThing pqueue
                 case e of
                     Nothing -> retry
                     Just event -> return event
-        putStrLn $ show event
+        putStrLn $ "Sending event to server..."
         hPutStr handle ((lookupUnHandler event) event)
         hFlush handle
 
@@ -54,11 +55,10 @@ recvEvents handle pqueue =
         hClose handle
     where
         toDispatch str = 
-            do  putStrLn $ "Message received: " ++ str
-                do case (parse parseMsg "" str) of
-                                    Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
-                                    Right event ->  do  putStrLn "Parsed Message"
-                                                        writeThing pqueue (lookupPriority event) event
+            do  case (parse parseMsg "" str) of
+                    Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
+                    Right event ->  do  putStrLn $ "received event from server"
+                                        atomically $ writeThing pqueue (lookupPriority event) event
 
         -- parsers is a global list of parsers imported from Events
         parseMsg = do choice parsers
