@@ -29,8 +29,8 @@ client ip priorities =
         outqueue <- makeQueues priorities
         inqueue <- makeQueues priorities
         -- fork communication threads to server
-        forkIO $ sendEvents handle outqueue
-        forkIO $ recvEvents handle inqueue
+        forkOS $ sendEvents handle outqueue
+        forkOS $ recvEvents handle inqueue
         -- outqueue is the outgoing messages to the server
         -- inqueue is the incoming messages from the server
         return (outqueue, inqueue)
