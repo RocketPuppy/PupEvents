@@ -1,4 +1,4 @@
-module Client (client) where
+module PupEventsClient (client) where
 
 import Network.Socket
 import System.IO
@@ -6,14 +6,13 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad
 import Text.Parsec
-import Events
-import PQueue
+import PupEventsPQueue
 
 -- The client works much like the Dispatcher, except it doesn't listen
 -- for connections from other places
 -- Make a socket, connect to server, send and receive events
-client Nothing priorities = client (Just "localhost") priorities
-client ip priorities =
+client Nothing priorities lookupPriority lookupUnHandler parsers = client (Just "localhost") priorities lookupPriority lookupUnHandler parsers
+client ip priorities lookupPriority lookupUnHandler parsers=
     -- get address info
     do  addrinfos <- getAddrInfo Nothing ip (Just "1267")
         let serveraddr = head addrinfos
@@ -29,25 +28,24 @@ client ip priorities =
         outqueue <- makeQueues priorities
         inqueue <- makeQueues priorities
         -- fork communication threads to server
-        forkOS $ sendEvents handle outqueue
-        forkOS $ recvEvents handle inqueue
+        forkOS $ sendEvents handle outqueue lookupUnHandler
+        forkOS $ recvEvents handle inqueue lookupPriority parsers
         -- outqueue is the outgoing messages to the server
         -- inqueue is the incoming messages from the server
         return (outqueue, inqueue)
 
 -- send events to the server for processing
-sendEvents handle pqueue = forever $
+sendEvents handle pqueue lookupUnHandler = forever $
     do  event <- atomically $
             do  e <- getThing pqueue
                 case e of
                     Nothing -> retry
                     Just event -> return event
-        putStrLn $ "Sending event to server..."
         hPutStr handle ((lookupUnHandler event) event)
         hFlush handle
 
--- Receive events until the connection is closed, parse them, and handle them
-recvEvents handle pqueue =
+-- Receive events until the connection is closed, parse them, and put them on the out queue
+recvEvents handle pqueue lookupPriority parsers =
     -- I don't really understand how these two lines work, but I think its
     -- got something to do with lazy evalution.  they're from RWH.
     do  messages <- hGetContents handle
@@ -57,8 +55,7 @@ recvEvents handle pqueue =
         toDispatch str = 
             do  case (parse parseMsg "" str) of
                     Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
-                    Right event ->  do  putStrLn $ "received event from server"
-                                        atomically $ writeThing pqueue (lookupPriority event) event
+                    Right event ->  atomically $ writeThing pqueue (lookupPriority event) event
 
         -- parsers is a global list of parsers imported from Events
         parseMsg = do choice parsers

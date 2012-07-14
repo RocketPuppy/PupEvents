@@ -1,4 +1,4 @@
-module PQueue where
+module PupEventsPQueue (makeQueues, getThing, writeThing) where
 
 import Control.Concurrent.STM
 import Control.Monad
@@ -6,7 +6,7 @@ import Control.Monad
 newtype Priority = Priority Int
 -- create pqueue
 makeQueues num =
-    do  replicateM 3 newTChanIO
+    do  replicateM num newTChanIO
 
 -- get the next thing in the queuern thing
 getThing [] = return Nothing
