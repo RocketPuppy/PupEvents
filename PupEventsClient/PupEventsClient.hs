@@ -41,7 +41,7 @@ sendEvents handle pqueue lookupUnHandler = forever $
                 case e of
                     Nothing -> retry
                     Just event -> return event
-        hPutStr handle ((lookupUnHandler event) event)
+        hPutStr handle (lookupUnHandler event event)
         hFlush handle
 
 -- Receive events until the connection is closed, parse them, and put them on the out queue
@@ -53,15 +53,15 @@ recvEvents handle pqueue lookupPriority parsers =
         hClose handle
     where
         toDispatch str = 
-            do  case (parse parseMsg "" str) of
-                    Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
-                    Right event ->  atomically $ writeThing pqueue (lookupPriority event) event
+            case parse parseMsg "" str of
+                Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
+                Right event ->  atomically $ writeThing pqueue (lookupPriority event) event
 
         -- parsers is a global list of parsers imported from Events
-        parseMsg = do choice parsers
+        parseMsg =  choice parsers
         nullLines "" = []
-        nullLines str = x:(nullLines xs)
+        nullLines str = x:nullLines xs
             where   (x, xs) = splitAt (nullLines' 0 str) str
                     nullLines' n [] = n
                     nullLines' n ('\0':'\0':str) = n+2
-                    nullLines' n (s:str) = (nullLines' (n+1) str)
+                    nullLines' n (s:str) = nullLines' (n+1) str

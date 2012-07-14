@@ -5,8 +5,7 @@ import Control.Monad
 
 newtype Priority = Priority Int
 -- create pqueue
-makeQueues num =
-    do  replicateM num newTChanIO
+makeQueues num = replicateM num newTChanIO
 
 -- get the next thing in the queuern thing
 getThing [] = return Nothing
@@ -18,6 +17,5 @@ getThing queues =
 
 -- write something to the queue
 writeThing queues priority thing =
-    do  if length queues < priority && priority > 0
-            then return ()
-            else writeTChan (queues !! priority) thing
+    unless (length queues < priority && priority > 0) $
+        writeTChan (queues !! priority) thing

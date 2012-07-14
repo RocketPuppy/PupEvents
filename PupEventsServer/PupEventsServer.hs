@@ -33,8 +33,8 @@ handleEvents handle pqueue lookupUnHandler lookupHandler = forever $
                 case event of
                     Nothing -> retry
                     Just event -> return event
-        event' <- (lookupHandler event) $ event
-        hPutStr handle ((lookupUnHandler event') event')
+        event' <- lookupHandler event event
+        hPutStr handle (lookupUnHandler event' event')
         hFlush handle
 
 -- accept a connection and fork a new thread to handle receiving events from it
@@ -50,7 +50,7 @@ acceptCon sock chansSend priorities lookupPriority lookupUnHandler lookupHandler
         pqueue <- makeQueues priorities
         forkIO (recvEvents connHandle pqueue lookupPriority parsers)
         forkIO (handleEvents connHandle pqueue lookupUnHandler lookupHandler)
-        atomically  $   do  modifyTVar chansSend (\xs -> (clientaddr, pqueue):xs)
+        atomically  $   modifyTVar chansSend (\xs -> (clientaddr, pqueue):xs)
 
 -- Receive events until the connection is closed, parse them, and push them on the
 -- channel to the dispatcher
@@ -62,13 +62,13 @@ recvEvents handle pqueue lookupPriority parsers =
         hClose handle
     where
         toDispatch str = 
-            do  case (parse parseMsg "" str) of
-                    Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
-                    Right a ->  atomically $ writeThing pqueue (lookupPriority a) a
-        parseMsg = do choice parsers
+            case parse parseMsg "" str of
+                Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
+                Right a ->  atomically $ writeThing pqueue (lookupPriority a) a
+        parseMsg =  choice parsers
         nullLines "" = []
-        nullLines str = x:(nullLines xs)
+        nullLines str = x:nullLines xs
             where   (x, xs) = splitAt (nullLines' 0 str) str
                     nullLines' n [] = n
                     nullLines' n ('\0':'\0':str) = n+2
-                    nullLines' n (s:str) = (nullLines' (n+1) str)
+                    nullLines' n (s:str) = nullLines' (n+1) str
