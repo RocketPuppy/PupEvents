@@ -25,3 +25,4 @@ library
     default-language:   Haskell98
     build-depends:      base == 4.*, stm >= 2.3, parsec >= 3.1.1,
                         Pup-Events-PQueue, network, transformers
+    ghc-options:        -threaded

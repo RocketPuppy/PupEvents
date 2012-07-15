@@ -23,6 +23,7 @@ executable server
     main-is:            EventsServer/ServerDemo.hs
     default-language:   Haskell98
     build-depends:      base == 4.*, Pup-Events-Server, parsec >= 3.1.1
+    ghc-options:        -threaded
 
 executable demo
     main-is:            EventsClient/Demo.hs
@@ -31,3 +32,4 @@ executable demo
                         Pup-Events-PQueue, parsec >= 3.1.1, GLUT
     hs-source-dirs:     ./, EventsClient/
     other-modules:      EventsClient
+    ghc-options:        -threaded
