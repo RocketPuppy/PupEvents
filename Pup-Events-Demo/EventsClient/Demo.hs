@@ -2,6 +2,7 @@
 -- demonstrate an example usage pattern. It simply takes a click in
 -- the window, sends it to the server (which negates the coordinates),
 -- and then paints the original and new Click coordinates with a point.
+-- This uses the -threaded option in GHC.
 module Main where
 
 import Graphics.Rendering.OpenGL.GL (($=), ($=!), makeGettableStateVar)
