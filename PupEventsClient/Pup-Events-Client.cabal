@@ -10,7 +10,7 @@ description:            Pup-Events is a networking enabled event handling
                         in the required functions for the client to work
                         properly.
                         properly.
-category:               Networking
+category:               Networking, Pup-Events
 author:                 Daniel Wilson
 maintainer:             wilsonhardrock@gmail.com
 copyright:              (c) 2012 Daniel Wilson
@@ -25,4 +25,3 @@ library
     default-language:   Haskell98
     build-depends:      base == 4.*, stm >= 2.3, parsec >= 3.1.1,
                         Pup-Events-PQueue, network, transformers
-    ghc-options:        -threaded

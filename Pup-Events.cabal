@@ -5,7 +5,7 @@ synopsis:               A networked event handling framework for hooking
 description:            Pup-Events is a networking enabled event handling
                         framework. This is a virtual package to install all
                         of the Pup-Events modules.
-category:               Networking
+category:               Networking, Pup-Events
 author:                 Daniel Wilson
 maintainer:             wilsonhardrock@gmail.com
 copyright:              (c) 2012 Daniel Wilson
