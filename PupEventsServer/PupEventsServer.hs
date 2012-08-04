@@ -48,8 +48,8 @@ handleEvents :: Handle -- ^ The handle to send the handled event on
                 -> PQueue t -- ^ The PQueue on which to listen for events to be handled
                 -> (t1 -> t1 -> String) -- ^ The lookup function to find the function that returns a string representation of the event.
                 -> (t -> t -> IO t1) -- ^ The lookup function that returns the event handler
-                -> IO b
-handleEvents handle pqueue lookupUnHandler lookupHandler = forever $
+                -> IO ()
+handleEvents handle pqueue lookupUnHandler lookupHandler =
     do  event <- atomically $
             do  event <- getThing pqueue
                 case event of
@@ -59,9 +59,10 @@ handleEvents handle pqueue lookupUnHandler lookupHandler = forever $
         C.catch (
             do  hPutStr handle (lookupUnHandler event' event')
                 hFlush handle
+                handleEvents handle pqueue lookupUnHandler lookupHandler
             ) (\e -> do let err = show (e :: C.IOException)
                         hPutStr stderr ("Client disconnected")
-                        return ())
+                        )
 
 
 -- accept a connection and fork a new thread to handle receiving events from it
