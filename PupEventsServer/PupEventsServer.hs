@@ -24,9 +24,10 @@ server ::   Maybe [Char] -- ^ The address to listen on, if it's not given defaul
             -> (t1 -> t1 -> String) -- ^ The lookup function to convert an event to a string representation
             -> (t -> t -> IO t1) -- ^ The lookup function to look up the handler for an event
             -> [ParsecT [Char] () Data.Functor.Identity.Identity t] -- ^ The list of parsers to try and parse events with
+            -> Maybe t -- ^Optional. The event to put on the pqueue when a client disconnects
             -> IO b
-server Nothing priorities lookupPriority lookupUnHandler lookupHandler parsers = server (Just "0.0.0.0") priorities lookupPriority lookupUnHandler lookupHandler parsers
-server ip priorities lookupPriority lookupUnHandler lookupHandler parsers = 
+server Nothing priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent = server (Just "0.0.0.0") priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent 
+server ip priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent = 
     do  -- get port
         addrinfos <- getAddrInfo (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
                                  ip (Just "1267")
@@ -38,7 +39,7 @@ server ip priorities lookupPriority lookupUnHandler lookupHandler parsers =
         -- listen with maximum 5 queued requests
         listen sock 5
         -- accept forever
-        forever $ acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers
+        forever $ acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent
 
 -- |Checks the given PQueue for an event to handle and calls the handler
 -- for it, then sends the event returned by the handler to the client.
@@ -67,8 +68,9 @@ acceptCon ::    Socket -- ^ The socket to listen for incoming connections on
                 -> (t1 -> t1 -> String) -- ^ The function to lookup the string representation for an event
                 -> (t -> t -> IO t1) -- ^ The function to lookup the handler for the event
                 -> [ParsecT [Char] () Data.Functor.Identity.Identity t] -- ^ A list of parsers to use when trying to parse Events
+                -> Maybe t -- ^Optional. The event to put on the pqueue when a client disconnects
                 -> IO ThreadId
-acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers =
+acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent =
     do  putStrLn "Accepting Connections"
         (connsock, clientaddr) <- accept sock
         putStrLn $ "Connection received from: " ++ show clientaddr
@@ -76,7 +78,7 @@ acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers =
         hSetBuffering connHandle NoBuffering
         hSetBinaryMode connHandle True
         pqueue <- makeQueues priorities
-        forkIO (recvEvents connHandle pqueue lookupPriority parsers)
+        forkIO (recvEvents connHandle pqueue lookupPriority parsers dcEvent)
         forkIO (handleEvents connHandle pqueue lookupUnHandler lookupHandler)
 
 -- Receive events until the connection is closed, parse them, and push them on the
@@ -86,13 +88,17 @@ recvEvents ::   Handle -- ^ The handle to listen for events on
                 -> PQueue a -- ^ The PQueue used to send events to the 'handleEvents' thread
                 -> (a -> Int) -- ^ The function to lookup the priority level of an event
                 -> [ParsecT [Char] () Data.Functor.Identity.Identity a] -- ^ A list of parsers to use when trying to parse Events
+                -> Maybe a -- ^Optional. The event to put on the pqueue when a client disconnects
                 -> IO ()
-recvEvents handle pqueue lookupPriority parsers =
+recvEvents handle pqueue lookupPriority parsers dcEvent =
     -- I don't really understand how these two lines work, but I think its
     -- got something to do with lazy evalution.  they're from RWH.
     do  messages <- hGetContents handle
         mapM_ toDispatch (nullLines messages)
         hClose handle
+        case dcEvent of
+            Just x -> atomically $ writeThing pqueue (lookupPriority x) x
+            Nothing -> return ()
     where
         toDispatch str = 
             case parse parseMsg "" str of
