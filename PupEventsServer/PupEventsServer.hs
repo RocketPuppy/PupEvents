@@ -10,6 +10,7 @@ import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan (tryReadTChan)
 import Control.Concurrent
 import Control.Monad
+import qualified Control.Exception as C
 import Text.Parsec
 import Network.Socket
 import System.IO
@@ -55,8 +56,13 @@ handleEvents handle pqueue lookupUnHandler lookupHandler = forever $
                     Nothing -> retry
                     Just event -> return event
         event' <- lookupHandler event event
-        hPutStr handle (lookupUnHandler event' event')
-        hFlush handle
+        C.catch (
+            do  hPutStr handle (lookupUnHandler event' event')
+                hFlush handle
+            ) (\e -> do let err = show (e :: C.IOException)
+                        hPutStr stderr ("Client disconnected")
+                        return ())
+
 
 -- accept a connection and fork a new thread to handle receiving events from it
 -- after the connection is accepted, create a new channel for the dispatcher to
