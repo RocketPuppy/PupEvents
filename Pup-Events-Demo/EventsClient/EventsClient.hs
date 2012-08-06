@@ -34,7 +34,7 @@ import qualified PupEventsClient
 -- |The doClient method is how we start the client side of the
 -- Pup-Events framework. It's called by the main application.
 doClient ip priorities =
-    do  (q1, q2) <- Client.client ip priorities lookupPriorityClient lookupUnHandlerClient parsersClient
+    do  (q1, q2, _) <- Client.client ip priorities lookupPriorityClient lookupUnHandlerClient parsersClient
         return (q1, q2)
 
 -- |Put your event models here
