@@ -1,5 +1,5 @@
 name:                   Pup-Events-Demo
-version:                1.1
+version:                1.2
 synopsis:               A networked event handling framework for hooking
                         into other programs.
 description:            Pup-Events is a networking enabled event handling
@@ -22,13 +22,13 @@ source-repository head
 executable server
     main-is:            EventsServer/ServerDemo.hs
     default-language:   Haskell98
-    build-depends:      base == 4.*, Pup-Events-Server, parsec >= 3.1.1
+    build-depends:      base == 4.*, Pup-Events-Server >= 1.1.2, parsec >= 3.1.1
     ghc-options:        -threaded
 
 executable demo
     main-is:            EventsClient/Demo.hs
     default-language:   Haskell98
-    build-depends:      base == 4.*, Pup-Events-Client, stm >= 2.2, OpenGL,
+    build-depends:      base == 4.*, Pup-Events-Client >= 1.1, stm >= 2.2, OpenGL,
                         Pup-Events-PQueue, parsec >= 3.1.1, GLUT
     hs-source-dirs:     ./, EventsClient/
     other-modules:      EventsClient
