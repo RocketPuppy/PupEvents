@@ -21,7 +21,7 @@ client ::   Maybe [Char] -- ^ The address to connect to. If ommitted we connect 
             -> (a -> Int) -- ^ A function to return the priority level of an event
             -> (t -> t -> String) -- ^ A function to return the string representation of an event
             -> [ParsecT [Char] () Data.Functor.Identity.Identity a] -- ^ A list of parsers that return Event objects
-            -> IO (PQueue t, PQueue a) -- ^ We return a pair of "PQueues" to use in communicating events. The first is for all events going to the server, the second is for events coming from the server.
+            -> IO (PQueue t, PQueue a, IO ()) -- ^ We return a pair of "PQueues" to use in communicating events. The first is for all events going to the server, the second is for events coming from the server. We also return a function to manually close both the socket and handle we use to connect to the server.
 client Nothing priorities lookupPriority lookupUnHandler parsers = client (Just "localhost") priorities lookupPriority lookupUnHandler parsers
 client ip priorities lookupPriority lookupUnHandler parsers=
     -- get address info
@@ -43,7 +43,7 @@ client ip priorities lookupPriority lookupUnHandler parsers=
         forkOS $ recvEvents handle inqueue lookupPriority parsers
         -- outqueue is the outgoing messages to the server
         -- inqueue is the incoming messages from the server
-        return (outqueue, inqueue)
+        return (outqueue, inqueue, (shutdown sock ShutdownBoth >> hClose handle))
 
 -- |The sendEvents function handles the sending of all outgoing events to the server. It checks for an event, blocks if none is available, and sends it.
 sendEvents ::   Handle -- ^ Handle to send events on
