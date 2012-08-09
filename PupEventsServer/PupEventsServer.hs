@@ -10,6 +10,7 @@ import Control.Concurrent.STM
 import Control.Concurrent.STM.TChan (tryReadTChan)
 import Control.Concurrent
 import Control.Monad
+import Control.Exception.Base (finally)
 import qualified Control.Exception as C
 import Text.Parsec
 import Network.Socket
@@ -40,7 +41,7 @@ server ip priorities lookupPriority lookupUnHandler lookupHandler parsers dcEven
         -- listen with maximum 5 queued requests
         listen sock 5
         -- accept forever
-        forever $ acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent
+        finally (forever $ acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent) (shutdown sock ShutdownBoth)
 
 -- |Checks the given PQueue for an event to handle and calls the handler
 -- for it, then sends the event returned by the handler to the client.
@@ -78,9 +79,9 @@ acceptCon ::    Socket -- ^ The socket to listen for incoming connections on
                 -> Maybe t -- ^Optional. The event to put on the pqueue when a client disconnects
                 -> IO ThreadId
 acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent =
-    do  putStrLn "Accepting Connections"
+    do  hPutStr stderr "Accepting Connections\n"
         (connsock, clientaddr) <- accept sock
-        putStrLn $ "Connection received from: " ++ show clientaddr
+        hPutStr stderr $ "Connection received from: " ++ show clientaddr ++ "\n"
         connHandle <- socketToHandle connsock ReadWriteMode
         hSetBuffering connHandle NoBuffering
         hSetBinaryMode connHandle True
@@ -109,7 +110,7 @@ recvEvents handle pqueue lookupPriority parsers dcEvent =
     where
         toDispatch str = 
             case parse parseMsg "" str of
-                Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
+                Left e -> hPutStr stderr $ "ParseError: " ++ show e ++ "\nString: " ++ show str ++ "\n"
                 Right a ->  atomically $ writeThing pqueue (lookupPriority a) a
         parseMsg =  choice parsers
         nullLines "" = []
