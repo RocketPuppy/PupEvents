@@ -75,7 +75,7 @@ recvEvents handle pqueue lookupPriority parsers =
         -- |Attempts to parse an event and send it to the queue.
         toDispatch str = 
             case parse parseMsg "" str of
-                Left e -> putStrLn $ "ParseError: " ++ show e ++ "\nString: " ++ show str
+                Left e -> hPutStr stderr $ "ParseError: " ++ show e ++ "\nString: " ++ show str ++ "\n"
                 Right event ->  atomically $ writeThing pqueue (lookupPriority event) event
 
         -- |Applies the parsers given in 'client' until one of them succeeds.
