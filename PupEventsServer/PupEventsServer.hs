@@ -41,7 +41,7 @@ server ip priorities lookupPriority lookupUnHandler lookupHandler parsers dcEven
         -- listen with maximum 5 queued requests
         listen sock 5
         -- accept forever
-        finally (forever $ acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent) (shutdown sock ShutdownBoth)
+        finally (forever $ acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent) ({-hPutStr stderr "Shutting down server..." >> -}sClose sock)
 
 -- |Checks the given PQueue for an event to handle and calls the handler
 -- for it, then sends the event returned by the handler to the client.
@@ -62,7 +62,8 @@ handleEvents handle pqueue lookupUnHandler lookupHandler =
                 hFlush handle
                 handleEvents handle pqueue lookupUnHandler lookupHandler
             ) (\e -> do let err = show (e :: C.IOException)
-                        hPutStr stderr ("Client disconnected")
+                        {-hPutStr stderr ("Client disconnected"-}
+                        return ()
                         )
 
 
@@ -79,9 +80,9 @@ acceptCon ::    Socket -- ^ The socket to listen for incoming connections on
                 -> Maybe t -- ^Optional. The event to put on the pqueue when a client disconnects
                 -> IO ThreadId
 acceptCon sock priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent =
-    do  hPutStr stderr "Accepting Connections\n"
+    do  {-hPutStr stderr "Accepting Connections\n"-}
         (connsock, clientaddr) <- accept sock
-        hPutStr stderr $ "Connection received from: " ++ show clientaddr ++ "\n"
+        --hPutStr stderr $ "Connection received from: " ++ show clientaddr ++ "\n"
         connHandle <- socketToHandle connsock ReadWriteMode
         hSetBuffering connHandle NoBuffering
         hSetBinaryMode connHandle True

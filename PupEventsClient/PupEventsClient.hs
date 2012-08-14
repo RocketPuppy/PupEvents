@@ -10,6 +10,8 @@ import Network.Socket
 import System.IO
 import Control.Concurrent
 import Control.Concurrent.STM
+import qualified Control.Exception as C
+import Control.Exception.Base (finally)
 import Control.Monad
 import Text.Parsec
 import PupEventsPQueue
@@ -39,25 +41,30 @@ client ip priorities lookupPriority lookupUnHandler parsers=
         outqueue <- makeQueues priorities
         inqueue <- makeQueues priorities
         -- fork communication threads to server
-        forkOS $ sendEvents handle outqueue lookupUnHandler
-        forkOS $ recvEvents handle inqueue lookupPriority parsers
+        t1 <- forkOS $ sendEvents handle outqueue lookupUnHandler
+        t2 <- forkOS $ recvEvents handle inqueue lookupPriority parsers
         -- outqueue is the outgoing messages to the server
         -- inqueue is the incoming messages from the server
-        return (outqueue, inqueue, (shutdown sock ShutdownBoth >> hClose handle))
+        return (outqueue, inqueue, {-(hPutStr stderr "shutting down client...\n" >>-} killThread t1 >> killThread t2 >> hClose handle {->> hPutStr stderr "client shutdown.\n")-})
 
 -- |The sendEvents function handles the sending of all outgoing events to the server. It checks for an event, blocks if none is available, and sends it.
 sendEvents ::   Handle -- ^ Handle to send events on
                 -> PQueue t -- ^ "PQueue" to listen on
                 -> (t -> t -> String) -- ^ A function to convert an Event to a string
-                -> IO b
-sendEvents handle pqueue lookupUnHandler = forever $
-    do  event <- atomically $
-            do  e <- getThing pqueue
-                case e of
-                    Nothing -> retry
-                    Just event -> return event
-        hPutStr handle (lookupUnHandler event event)
-        hFlush handle
+                -> IO ()
+sendEvents handle pqueue lookupUnHandler = finally
+    (forever $
+        do  event <- atomically $
+                do  e <- getThing pqueue
+                    case e of
+                        Nothing -> retry
+                        Just event -> return event
+            hPutStr handle (lookupUnHandler event event)
+            hFlush handle
+            sendEvents handle pqueue lookupUnHandler)
+    (do hClose handle
+        --hPutStr stderr ("sendEvents exiting...\n")
+        )
 
 -- |The recvEvents function receives events until the connection is closed, parses them, and puts them on the queue to be handled by the application.
 recvEvents ::   Handle -- ^ Handle listen on
@@ -65,12 +72,13 @@ recvEvents ::   Handle -- ^ Handle listen on
                 -> (a -> Int) -- ^ Function to lookup the priority level of an event
                 -> [ParsecT [Char] () Data.Functor.Identity.Identity a] -- ^ A list of parsers to apply to parse an event
                 -> IO ()
-recvEvents handle pqueue lookupPriority parsers =
+recvEvents handle pqueue lookupPriority parsers = finally
     -- I don't really understand how these two lines work, but I think its
     -- got something to do with lazy evalution.  they're from RWH.
-    do  messages <- hGetContents handle
-        mapM_ toDispatch (nullLines messages)
-        hClose handle
+    (do messages <- hGetContents handle
+        mapM_ toDispatch (nullLines messages))
+    (do hClose handle
+        {-hPutStr stderr "recvEvents exiting...\n"-})
     where
         -- |Attempts to parse an event and send it to the queue.
         toDispatch str = 
