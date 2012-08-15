@@ -6,7 +6,7 @@ description:            Pup-Events is a networking enabled event handling
                         framework. This package contains the Priority Queue
                         implementation used in the Pup-Events-Client and
                         Pup-Events-Server packages.
-category:               Networking
+category:               Networking, Pup-Events
 author:                 Daniel Wilson
 maintainer:             wilsonhardrock@gmail.com
 copyright:              (c) 2012 Daniel Wilson
