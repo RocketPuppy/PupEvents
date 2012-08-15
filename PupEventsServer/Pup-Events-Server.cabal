@@ -1,5 +1,5 @@
 name:                   Pup-Events-Server
-version:                1.1.5
+version:                1.2
 synopsis:               A networked event handling framework for hooking
                         into other programs.
 description:            Pup-Events is a networking enabled event handling
