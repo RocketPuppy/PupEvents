@@ -22,17 +22,18 @@ import Data.Functor.Identity
 -- |The main entry point of the program. This ends by forever calling 'acceptCon'.
 server ::   Maybe [Char] -- ^ The address to listen on, if it's not given default to "0.0.0.0".
             -> Int -- ^ The number of priority levels to create the PQueue with
+            -> String -- ^ The port to start on
             -> (t -> Int) -- ^ The function to look up the priority level of an event
             -> (t1 -> t1 -> String) -- ^ The lookup function to convert an event to a string representation
             -> (t -> t -> IO t1) -- ^ The lookup function to look up the handler for an event
             -> [ParsecT [Char] () Data.Functor.Identity.Identity t] -- ^ The list of parsers to try and parse events with
             -> Maybe t -- ^Optional. The event to put on the pqueue when a client disconnects
             -> IO b
-server Nothing priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent = server (Just "0.0.0.0") priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent 
-server ip priorities lookupPriority lookupUnHandler lookupHandler parsers dcEvent = 
+server Nothing priorities port lookupPriority lookupUnHandler lookupHandler parsers dcEvent = server (Just "0.0.0.0") priorities port lookupPriority lookupUnHandler lookupHandler parsers dcEvent 
+server ip priorities port lookupPriority lookupUnHandler lookupHandler parsers dcEvent = 
     do  -- get port
         addrinfos <- getAddrInfo (Just (defaultHints {addrFlags = [AI_PASSIVE]}))
-                                 ip (Just "1267")
+                                 ip (Just port)
         let serveraddr = head addrinfos
         -- create socket
         sock <- socket (addrFamily serveraddr) Stream 6
