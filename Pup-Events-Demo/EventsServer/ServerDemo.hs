@@ -29,7 +29,7 @@ main =
     do  args <- getArgs
         let ip = args !! 0
         let priorities = read (args !! 1) :: Int
-        Server.server (Just ip) priorities lookupPriorityServer lookupUnHandlerServer lookupHandlerServer parsersServer Nothing
+        Server.server (Just ip) priorities "1267" lookupPriorityServer lookupUnHandlerServer lookupHandlerServer parsersServer Nothing
 
 -- |Put your event models here. I haven't done so here, but you can define an event that will fire whenever a client disconnects and pass it into @Server.server@. This would be useful in an application requiring authentication to log out a client whenever they disconnect.
 data Event = Click Float Float | Init
