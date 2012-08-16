@@ -20,14 +20,15 @@ import Data.Functor.Identity
 -- |The client function is the main entry point for the client code. It creates a socket, spawns two processes ('sendEvents' and 'recvEvents') to handle outgoing and incoming events, and returns the queues used to communicate with those processes.
 client ::   Maybe [Char] -- ^ The address to connect to. If ommitted we connect to 'localhost'
             -> Int -- ^ The number of priorities in the PQueue
+            -> String -- ^ The port to start the client on.
             -> (a -> Int) -- ^ A function to return the priority level of an event
             -> (t -> t -> String) -- ^ A function to return the string representation of an event
             -> [ParsecT [Char] () Data.Functor.Identity.Identity a] -- ^ A list of parsers that return Event objects
             -> IO (PQueue t, PQueue a, IO ()) -- ^ We return a pair of "PQueues" to use in communicating events. The first is for all events going to the server, the second is for events coming from the server. We also return a function to manually close both the socket and handle we use to connect to the server.
-client Nothing priorities lookupPriority lookupUnHandler parsers = client (Just "localhost") priorities lookupPriority lookupUnHandler parsers
-client ip priorities lookupPriority lookupUnHandler parsers=
+client Nothing priorities port lookupPriority lookupUnHandler parsers = client (Just "localhost") priorities port lookupPriority lookupUnHandler parsers
+client ip priorities port lookupPriority lookupUnHandler parsers=
     -- get address info
-    do  addrinfos <- getAddrInfo Nothing ip (Just "1267")
+    do  addrinfos <- getAddrInfo Nothing ip (Just port)
         let serveraddr = head addrinfos
         -- create socket
         sock <- socket (addrFamily serveraddr) Stream 6
